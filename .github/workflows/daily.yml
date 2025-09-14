@@ -1,0 +1,52 @@
+name: Correr script diario
+
+on:
+  schedule:
+    - cron: "0 21 * * *"   # 21:00 UTC = 18:00 America/Argentina/Buenos_Aires
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: daily-run
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            **/requirements.txt
+
+      - name: Install dependencies (si existe requirements)
+        if: ${{ hashFiles('**/requirements.txt') != '' }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Mostrar entorno y archivos
+        run: |
+          python -V
+          pwd
+          ls -la
+          echo "PYTHONPATH=$PYTHONPATH"
+
+      - name: Ejecutar script (guardando log)
+        run: |
+          set -euxo pipefail
+          python bot_alerta_tendencias.py 2>&1 | tee run.log
+
+      - name: Subir log si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-log
+          path: run.log

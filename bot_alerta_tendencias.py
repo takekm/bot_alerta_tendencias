@@ -25,24 +25,46 @@ mensaje["To"] = destinatario
 mensaje["Subject"] = "Correo de prueba en Python"
 
 # Descargar datos de Apple
-data = yf.download("AAPL", start=fecha_hoy_ly_str, end=fecha_hoy_str).reset_index()
-#Generamos una columna con el nombre del ticker
+data = yf.download("MSFT", start=fecha_hoy_ly_str, end=fecha_hoy_str).reset_index()
 data['Ticker']=data.columns.get_level_values(1)[1]
-# reset_index para darle formato al df
+# después de tu download + reset_index
 if isinstance(data.columns, pd.MultiIndex):
     data.columns = data.columns.get_level_values(0)
-#Generamos una copia
+
 df_precios=data.copy()
 # Aseguramos que la columna Date sea de tipo fecha
 df_precios["Date"] = pd.to_datetime(df_precios["Date"])
 df_precios = df_precios.sort_values("Date")  # ordenar por fecha
+
 # Calcular medias móviles
 df_precios["SMA50"] = df_precios["Close"].rolling(50).mean()
 df_precios["SMA5"] = df_precios["Close"].rolling(5).mean()
 
-#Medias Móviles Simples
 # Regla simple: SMA50 vs SMA200
 df_precios["SMA Cross"] = df_precios.apply(
     lambda row: "Alcista" if row["SMA5"] > row["SMA50"] else "Bajista",
     axis=1
 )
+
+if (df_precios["SMA Cross"].iloc[-2]=="Alcista") & (df_precios["SMA Cross"].iloc[-1]=="Bajista"):
+    cuerpo="Inicio de Tendencia Bajista: VENDER"
+elif (df_precios["SMA Cross"].iloc[-2]=="Bajista") & (df_precios["SMA Cross"].iloc[-1]=="Alcista"):
+    cuerpo="Inicio de Tendencia Alcista: COMPRAR"
+elif (df_precios["SMA Cross"].iloc[-2]=="Bajista") & (df_precios["SMA Cross"].iloc[-1]=="Bajista"):
+    cuerpo="Se mantiene bajista"
+elif (df_precios["SMA Cross"].iloc[-2]=="Bajista") & (df_precios["SMA Cross"].iloc[-1]=="Bajista"):
+    cuerpo="Se mantiene alcista"
+print(cuerpo)
+# Cuerpo del correo
+mensaje.attach(MIMEText(cuerpo, "plain"))
+
+try:
+    # Conectar al servidor SMTP
+    servidor = smtplib.SMTP(smtp_server, smtp_port)
+    servidor.starttls()  # Seguridad TLS
+    servidor.login(remitente, password)
+    servidor.send_message(mensaje)
+    servidor.quit()
+    print(f"Correo enviado exitosamente {destinatario}  ✅")
+except Exception as e:
+    print(f"Error al enviar el correo: {e}")

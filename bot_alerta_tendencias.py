@@ -1,3 +1,4 @@
+#Importamos librerías
 import yfinance as yf
 import pandas as pd
 import smtplib
@@ -6,12 +7,15 @@ from email.mime.text import MIMEText
 import datetime
 from datetime import timedelta
 
+#Ticker a evaluar
+ticker="MSFT.BA"
+
 #Declaramos fechas
 fecha_hoy = datetime.date.today()
-fecha_hoy_ly = fecha_hoy - datetime.timedelta(days=365)
+fecha_hoy_inicio = fecha_hoy - datetime.timedelta(days=180)
 #Pasamos a string
 fecha_hoy_str=fecha_hoy.strftime("%Y-%m-%d")
-fecha_hoy_ly_str=fecha_hoy_ly.strftime("%Y-%m-%d")
+fecha_hoy_inicio_str=fecha_hoy_inicio.strftime("%Y-%m-%d")
 
 #Datos de autenticación de mailing
 smtp_server = "smtp.gmail.com"
@@ -24,8 +28,8 @@ mensaje["From"] = "BOT Python - Take"
 mensaje["To"] = destinatario
 mensaje["Subject"] = "Correo de prueba en Python"
 
-# Descargar datos de Apple
-data = yf.download("MSFT", start=fecha_hoy_ly_str, end=fecha_hoy_str).reset_index()
+# Descargar datos 
+data = yf.download(ticker, start=fecha_hoy_inicio_str, end=fecha_hoy_str).reset_index()
 data['Ticker']=data.columns.get_level_values(1)[1]
 # después de tu download + reset_index
 if isinstance(data.columns, pd.MultiIndex):
@@ -37,8 +41,8 @@ df_precios["Date"] = pd.to_datetime(df_precios["Date"])
 df_precios = df_precios.sort_values("Date")  # ordenar por fecha
 
 # Calcular medias móviles
-df_precios["SMA50"] = df_precios["Close"].rolling(50).mean()
-df_precios["SMA5"] = df_precios["Close"].rolling(5).mean()
+df_precios["SMA50"] = df_precios["Close"].rolling(20).mean()
+df_precios["SMA5"] = df_precios["Close"].rolling(1).mean()
 
 # Regla simple: SMA50 vs SMA200
 df_precios["SMA Cross"] = df_precios.apply(

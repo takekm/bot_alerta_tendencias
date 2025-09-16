@@ -1,17 +1,18 @@
 #Importamos librerías
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import datetime
 from datetime import timedelta
 
-#Ticker a evaluar
-ticker="MSFT.BA"
+#Tickers a evaluar
+tickers=["XLF.BA","XLK.BA","XLE.BA","ARKK.BA","QQQ.BA","SPY.BA","MSFT.BA","BYD.BA","TM.BA","XOM.BA","JNJ.BA","PG.BA"]
 
 #Declaramos fechas
-fecha_hoy = datetime.date.today()
+fecha_hoy = datetime.date.today()+ timedelta(days=1) #Agregar un día porque la descarga de yfinance es exclusivo en su límite superior.
 fecha_hoy_inicio = fecha_hoy - datetime.timedelta(days=180)
 #Pasamos a string
 fecha_hoy_str=fecha_hoy.strftime("%Y-%m-%d")
@@ -26,42 +27,60 @@ destinatario = "takeshikamada@hotmail.com"
 mensaje = MIMEMultipart()
 mensaje["From"] = "BOT Python - Take"
 mensaje["To"] = destinatario
-mensaje["Subject"] = "Correo de prueba en Python"
+mensaje["Subject"] = "Resumen de tendencias"
+#Lista y df vacíos
+df_precios_concatenado=pd.DataFrame()
+mensajes=[]
+#Recorremos cada ticker
+for ticker in tickers:
+    data = yf.download(ticker, start=fecha_hoy_inicio_str, end=fecha_hoy_str, progress=False)
 
-# Descargar datos 
-data = yf.download(ticker, start=fecha_hoy_inicio_str, end=fecha_hoy_str).reset_index()
-data['Ticker']=data.columns.get_level_values(1)[1]
-# después de tu download + reset_index
-if isinstance(data.columns, pd.MultiIndex):
-    data.columns = data.columns.get_level_values(0)
+    # 1) No romper si no hay datos
+    if data is None or data.empty:
+        mensajes.append(f"{ticker}: sin datos en el rango.")
+        continue
 
-df_precios=data.copy()
-# Aseguramos que la columna Date sea de tipo fecha
-df_precios["Date"] = pd.to_datetime(df_precios["Date"])
-df_precios = df_precios.sort_values("Date")  # ordenar por fecha
+    df = data.reset_index().copy()
+    df["Ticker"] = ticker
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.sort_values("Date")
 
-# Calcular medias móviles
-df_precios["SMA50"] = df_precios["Close"].rolling(20).mean()
-df_precios["SMA5"] = df_precios["Close"].rolling(1).mean()
+    # 2) SMAs con min_periods para evitar señales prematuras
+    df["SMA5"]  = df["Close"].rolling(5,  min_periods=5).mean()
+    df["SMA50"] = df["Close"].rolling(50, min_periods=50).mean()
 
-# Regla simple: SMA50 vs SMA200
-df_precios["SMA Cross"] = df_precios.apply(
-    lambda row: "Alcista" if row["SMA5"] > row["SMA50"] else "Bajista",
-    axis=1
-)
+    # 3) Estado solo donde haya ambas SMAs
+    estado = pd.Series(index=df.index, dtype="object")
+    mask_ok = df["SMA5"].notna() & df["SMA50"].notna()
+    estado[mask_ok] = np.where(df.loc[mask_ok, "SMA5"] > df.loc[mask_ok, "SMA50"], "Alcista", "Bajista")
 
-if (df_precios["SMA Cross"].iloc[-2]=="Alcista") & (df_precios["SMA Cross"].iloc[-1]=="Bajista"):
-    cuerpo="Inicio de Tendencia Bajista: VENDER"
-elif (df_precios["SMA Cross"].iloc[-2]=="Bajista") & (df_precios["SMA Cross"].iloc[-1]=="Alcista"):
-    cuerpo="Inicio de Tendencia Alcista: COMPRAR"
-elif (df_precios["SMA Cross"].iloc[-2]=="Bajista") & (df_precios["SMA Cross"].iloc[-1]=="Bajista"):
-    cuerpo="Se mantiene bajista"
-elif (df_precios["SMA Cross"].iloc[-2]=="Bajista") & (df_precios["SMA Cross"].iloc[-1]=="Bajista"):
-    cuerpo="Se mantiene alcista"
-print(cuerpo)
+    # 4) Tomar los últimos DOS estados válidos
+    ult2 = estado.dropna().tail(2)
+
+    if len(ult2) < 2:
+        mensajes.append(f"{ticker}: datos insuficientes (necesita ≥ 50 velas).")
+        # igual acumulá el df si lo usás después
+        df_precios_concatenado = pd.concat([df_precios_concatenado, df], ignore_index=True)
+        continue
+
+    prev, curr = ult2.iloc[-2], ult2.iloc[-1]
+
+    if prev == "Alcista" and curr == "Bajista":
+        mensajes.append(f"{ticker}: Inicio de tendencia Bajista → VENDER")
+    elif prev == "Bajista" and curr == "Alcista":
+        mensajes.append(f"{ticker}: Inicio de tendencia Alcista → COMPRAR")
+    elif curr == "Bajista":
+        mensajes.append(f"{ticker}: Se mantiene Bajista")
+    else:
+        mensajes.append(f"{ticker}: Se mantiene Alcista")
+
+    df_precios_concatenado = pd.concat([df_precios_concatenado, df], ignore_index=True)
+
+
+cuerpo = "\n".join(mensajes)
+
 # Cuerpo del correo
 mensaje.attach(MIMEText(cuerpo, "plain"))
-
 try:
     # Conectar al servidor SMTP
     servidor = smtplib.SMTP(smtp_server, smtp_port)

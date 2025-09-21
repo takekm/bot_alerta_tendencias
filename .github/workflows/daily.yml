@@ -2,7 +2,7 @@ name: Correr script diario
 
 on:
   schedule:
-    - cron: "0 21 * * 1-5"   # 21:00 UTC = 18:00 America/Argentina/Buenos_Aires
+    - cron: "0 21 * * *"   # 21:00 UTC = 18:00 America/Argentina/Buenos_Aires
   workflow_dispatch:
 
 jobs:

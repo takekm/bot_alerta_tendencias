@@ -10,15 +10,68 @@ from datetime import timedelta
 from html import escape
 
 #Tickers a evaluar
-tickers=["XLF.BA","XLK.BA","XLE.BA","ARKK.BA","QQQ.BA","SPY.BA","MSFT.BA","AAPL.BA","AMZN.BA","GOOGL.BA","IBM.BA","KO.BA","MCD.BA","MELI.BA","CELU.BA","HARG.BA","LOMA.BA","MOLI.BA","PAMP.BA","TXAR.BA","YPFD.BA","TM.BA","XOM.BA","JNJ.BA","PG.BA","GGAL.BA","TSM.BA"]
-
 tickers_cedear = [
-    "XLF.BA","XLK.BA","XLE.BA","ARKK.BA","QQQ.BA","SPY.BA",  # ETFs
-    "MSFT.BA","AAPL.BA","AMZN.BA","GOOGL.BA","IBM.BA","KO.BA","MCD.BA",
-    "MELI.BA","TM.BA","XOM.BA","JNJ.BA","PG.BA","TSM.BA"
+    # Big Tech
+    "AAPL.BA", "MSFT.BA", "AMZN.BA", "GOOGL.BA", "META.BA", "NVDA.BA", "TSLA.BA",
+    "NFLX.BA", "AMD.BA", "INTC.BA", "ORCL.BA",
+
+    # Consumo masivo
+    "KO.BA", "PEP.BA", "PG.BA", "WMT.BA", "DIS.BA", "MCD.BA", "NKE.BA", "COST.BA",
+
+    # Finanzas
+    "JPM.BA", "GS.BA", "BRK.BA", "C.BA", "BAC.BA", "AXP.BA", "V.BA", "MA.BA",
+
+    # Energía y materias primas
+    "XOM.BA", "CVX.BA", "SHEL.BA", "BP.BA", "RIO.BA", "VALE.BA", "BHP.BA",
+
+    # Salud
+    "PFE.BA", "JNJ.BA", "MRK.BA", "ABBV.BA", "LLY.BA",
+
+    # Empresas globales con presencia local
+    "MELI.BA", "GLOB.BA", "BABA.BA", "TSM.BA", "VIST.BA",
+
+    # ETFs CEDEARs
+    "SPY.BA", "QQQ.BA", "ARKK.BA", "XLF.BA", "XLK.BA", "XLE.BA", "XLI.BA", "XLP.BA", "XLY.BA"
 ]
 
-tickers_acciones = ["CELU.BA","HARG.BA","LOMA.BA","MOLI.BA","PAMP.BA","TXAR.BA","YPFD.BA","GGAL.BA"]
+tickers_acciones = [
+    # Bancos
+    "GGAL.BA", "BMA.BA", "SUPV.BA", "BBAR.BA", "BPAT.BA", "BRIO.BA",
+
+    # Energía & Oil & Gas
+    "YPFD.BA", "PAMP.BA", "TRAN.BA", "EDN.BA", "CEPU.BA",
+    "METR.BA", "DGCU2.BA", "VISTA.BA", "CAPX.BA",
+
+    # Acero, materiales e industria
+    "TXAR.BA", "ALUA.BA", "ERAR.BA", "AUSO.BA", "MOLA.BA", "MOLI.BA", "LOMA.BA",
+    "HARG.BA", "CELU.BA",
+
+    # Consumo & retail
+    "TGSU2.BA", "CRES.BA", "DYCA.BA", "SEMI.BA", "CARC.BA", "MIRG.BA",
+    "AGRO.BA", "INTR.BA",
+
+    # Telecomunicaciones & tecnología
+    "TECO2.BA", "CTIO.BA", "COME.BA",
+
+    # Seguros, servicios & otros
+    "VALO.BA", "IRSA.BA", "IRCP.BA", "CVH.BA", "EDLH.BA", "POLL.BA",
+    "OEST.BA", "GAMI.BA", "GRIM.BA",
+
+    # Panel General con buen volumen
+    "BOLT.BA", "RICH.BA", "SAMI.BA"
+]
+
+tickers_cripto = [
+    "BTC-USD", "ETH-USD", "BNB-USD",
+    "XRP-USD", "SOL-USD", "ADA-USD", "DOGE-USD", "TRX-USD",
+    "DOT-USD", "AVAX-USD", "BCH-USD",
+    "LTC-USD", "MATIC-USD", "LINK-USD", "XLM-USD",
+    "ATOM-USD", "ETC-USD", "XMR-USD", "NEAR-USD", 
+    "OP-USD", "INJ-USD", "SUI-USD", "HBAR-USD",
+    "MKR-USD", "AAVE-USD", "IMX-USD", "FIL-USD", "ICP-USD"
+]
+
+tickers= tickers_cedear +  tickers_acciones +  tickers_cripto
 
 #Declaramos fechas
 fecha_hoy = datetime.date.today()
@@ -54,38 +107,45 @@ def formatear_numero(valor):
         return "Sin Dato"
 
 
-# Registros tabulares (además de los mensajes de texto)
-registros_cedear   = []
-registros_acciones = []
-registros_general  = []
 
-def agregar_registro(a_que_lista, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,
-                     streak_ruedas=None, dias_calendario=None):
+#Función para generar una tabla resumen consolidada de todos los tickers
+def agregar_registro(a_que_lista, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=None):
     a_que_lista.append({
         "Ticker": ticker,
         "Señal": señal,
+        "Cierre": cierre,
         "SMA20_ayer": SMALP_LD,
         "SMA20_hoy":  SMALP_TD,
         "SMA5_ayer":  SMACP_LD,
         "SMA5_hoy":   SMACP_TD,
         "Rachas (ruedas)": streak_ruedas if streak_ruedas is not None else "—",
-        "Rachas (días)":   dias_calendario if dias_calendario is not None else "—",
     })
 
 
-
-#Lista y df vacíos
+#df vacío para alojar los datos concatenados
 df_precios_concatenado=pd.DataFrame()
-mensajes_general=[]
-mensajes_cedear=[]
-mensajes_acciones=[]
+
+# Registros tabulares (además de los mensajes de texto)
+registros_cedear   = []
+registros_acciones = []
+registros_cripto = []
+registros_general  = []
+
+
 #Recorremos cada ticker
 for ticker in tickers:
-    data = yf.download(ticker, start=fecha_inicio_str, end=fecha_cierre_str, progress=False)
+    data = yf.download(    
+    ticker,
+    start=fecha_inicio_str,
+    end=fecha_cierre_str,
+    interval="1d",
+    #auto_adjust=True,
+    progress=False,
+    threads=True
+    ).reset_index()
     data.columns = data.columns.get_level_values(0)
     # 1) No romper si no hay datos
     if data is None or data.empty:
-        mensajes_general.append(f"{ticker}: sin datos en el rango.")
         continue
 
     df = data.reset_index().copy()
@@ -94,42 +154,44 @@ for ticker in tickers:
     df = df.sort_values("Date")
 
     # 2) SMAs con min_periods para evitar señales prematuras
-    df["SMA5"]  = df["Close"].rolling(5,  min_periods=5).mean()
-    df["SMA20"] = df["Close"].rolling(20, min_periods=20).mean()
+    df["EMA5"]  = df["Close"].ewm(span=5,  adjust=False, min_periods=5).mean()
+    df["EMA20"] = df["Close"].ewm(span=20, adjust=False, min_periods=20).mean()
 
     if len(df.tail(2))>=2:
-        SMALP_LD =df["SMA20"].iloc[-2]
-        SMACP_LD=df["SMA5"].iloc[-2]
+        SMALP_LD =df["EMA20"].iloc[-2]
+        SMACP_LD=df["EMA5"].iloc[-2]
     else:
         SMALP_LD ="Sin Dato"
         SMACP_LD= "Sin Dato"
     
     if len(df.tail(2))>=1:
-        SMALP_TD =df["SMA20"].iloc[-1]
-        SMACP_TD=df["SMA5"].iloc[-1]
+        SMALP_TD =df["EMA20"].iloc[-1]
+        SMACP_TD=df["EMA5"].iloc[-1]
+        cierre=df["Close"].iloc[-1]
     else:
         SMALP_TD ="Sin Dato"
         SMACP_TD= "Sin Dato"
+        cierre="Sin Dato"
     
     #Formateamos 
     SMALP_LD=formatear_numero(SMALP_LD)
     SMACP_LD=formatear_numero(SMACP_LD)
     SMALP_TD=formatear_numero(SMALP_TD)
     SMACP_TD=formatear_numero(SMACP_TD)
-    
+    cierre=formatear_numero(cierre)
 
     # 3) Estado solo donde haya ambas SMAs
     estado = pd.Series(index=df.index, dtype="object")
-    mask_ok = df["SMA5"].notna() & df["SMA20"].notna()
-    estado[mask_ok] = np.where(df.loc[mask_ok, "SMA5"] > df.loc[mask_ok, "SMA20"], "Alcista", "Bajista")
+    mask_ok = df["EMA5"].notna() & df["EMA20"].notna()
+    estado[mask_ok] = np.where(df.loc[mask_ok, "EMA5"] > df.loc[mask_ok, "EMA20"], "Alcista", "Bajista")
 
     # --- cálculo de streak del estado actual ---
-    estado_valid   = estado[mask_ok]                  # solo donde hay SMA5 y SMA20
+    estado_valid   = estado[mask_ok]                  # solo donde hay EMA5 y EMA20
     fechas_valid   = df.loc[mask_ok, "Date"]
 
     if estado_valid.dropna().empty:
         streak_ruedas = None
-        dias_calendario = None
+        
     else:
         # Agrupar por rachas consecutivas (run-length encoding)
         grupos = (estado_valid != estado_valid.shift()).cumsum()
@@ -137,10 +199,6 @@ for ticker in tickers:
         # Racha actual = tamaño del último grupo
         streak_ruedas = int(tamanio_grupo.iloc[-1])
 
-        # También podés calcular días de calendario (incluye fines de semana)
-        inicio_racha = fechas_valid.groupby(grupos).transform("first").iloc[-1]
-        fin_racha    = fechas_valid.iloc[-1]
-        dias_calendario = (fin_racha - inicio_racha).days + 1  # +1 para contar el día inicial
 
 
     # 4) Tomar los últimos DOS estados válidos
@@ -148,7 +206,7 @@ for ticker in tickers:
    
 
     if len(ult2) < 2:
-        mensajes_general.append(f"{ticker}: datos insuficientes")
+        
         # igual acumulá el df si lo usás después
         df_precios_concatenado = pd.concat([df_precios_concatenado, df], ignore_index=True)
         continue
@@ -157,56 +215,56 @@ for ticker in tickers:
 
     if prev == "Alcista" and curr == "Bajista":
         if ticker in tickers_cedear:
-            mensajes_cedear.append(f"{ticker}: Inicio de tendencia Bajista → VENDER | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Inicio de tendencia Bajista → VENDER"
-            agregar_registro(registros_cedear, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_cedear, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
         elif ticker in tickers_acciones:
-            mensajes_acciones.append(f"{ticker}: Inicio de tendencia Bajista → VENDER | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Inicio de tendencia Bajista → VENDER"
-            agregar_registro(registros_acciones, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_acciones, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
+        elif ticker in tickers_cripto:
+            señal="Inicio de tendencia Bajista → VENDER"
+            agregar_registro(registros_cripto, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
         else:
-            mensajes_general.append(f"{ticker}: Inicio de tendencia Bajista → VENDER | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Inicio de tendencia Bajista → VENDER"
-            agregar_registro(registros_general, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_general, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
     elif prev == "Bajista" and curr == "Alcista":
         if ticker in tickers_cedear:
-            mensajes_cedear.append(f"{ticker}: Inicio de tendencia Alcista → COMPRAR | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Inicio de tendencia Alcista → COMPRAR"
-            agregar_registro(registros_cedear, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_cedear, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
         elif ticker in tickers_acciones:
-            mensajes_acciones.append(f"{ticker}: Inicio de tendencia Alcista → COMPRAR | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Inicio de tendencia Alcista → COMPRAR"
-            agregar_registro(registros_acciones, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_acciones, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
+        elif ticker in tickers_cripto:
+            señal="Inicio de tendencia Alcista → COMPRAR"
+            agregar_registro(registros_cripto, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
         else:
-            mensajes_general.append(f"{ticker}: Inicio de tendencia Alcista → COMPRAR | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Inicio de tendencia Alcista → COMPRAR"
-            agregar_registro(registros_general, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_general, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
     elif prev == "Bajista" and curr == "Bajista":
         if ticker in tickers_cedear:
-            mensajes_cedear.append(f"{ticker}: Se mantiene Bajista | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Se mantiene Bajista"
-            agregar_registro(registros_cedear, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_cedear, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
         elif ticker in tickers_acciones:
-            mensajes_acciones.append(f"{ticker}: Se mantiene Bajista | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Se mantiene Bajista"
-            agregar_registro(registros_acciones, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_acciones, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
+        elif ticker in tickers_cripto:
+            señal="Se mantiene Bajista"
+            agregar_registro(registros_cripto, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
         else:
-            mensajes_general.append(f"{ticker}: Se mantiene Bajista | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Se mantiene Bajista"
-            agregar_registro(registros_general, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_general, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
     else:
         if ticker in tickers_cedear:
-            mensajes_cedear.append(f"{ticker}: Se mantiene Alcista | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Se mantiene Alcista"
-            agregar_registro(registros_cedear, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_cedear, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
         elif ticker in tickers_acciones:
-            mensajes_acciones.append(f"{ticker}: Se mantiene Alcista | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Se mantiene Alcista"
-            agregar_registro(registros_acciones, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_acciones, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
+        elif ticker in tickers_cripto:
+            señal="Se mantiene Alcista"
+            agregar_registro(registros_cripto, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
         else:
-            mensajes_general.append(f"{ticker}: Se mantiene Alcista | SMA20 ayer: ${SMALP_LD} - SMA20 hoy: ${SMALP_TD} | SMA5 ayer: ${SMACP_LD} - SMA5 hoy: ${SMACP_TD}")
             señal="Se mantiene Alcista"
-            agregar_registro(registros_general, ticker, señal, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=streak_ruedas, dias_calendario=dias_calendario)
+            agregar_registro(registros_general, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
 
 
     df_precios_concatenado = pd.concat([df_precios_concatenado, df], ignore_index=True)
@@ -247,12 +305,12 @@ def construir_tabla_html(registros, titulo):
       <tr>
         <th style="text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;">Ticker</th>
         <th style="text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;">Señal</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">SMA20 ayer</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">SMA20 hoy</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">SMA5 ayer</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">SMA5 hoy</th>
+        <th style="text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;">Cierre</th>
+        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">EMA20 ayer</th>
+        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">EMA20 hoy</th>
+        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">EMA5 ayer</th>
+        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">EMA5 hoy</th>
         <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">Racha (ruedas)</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">Racha (días)</th>
       </tr>
     </thead>
     """
@@ -276,12 +334,12 @@ def construir_tabla_html(registros, titulo):
         <tr style="background:{bg};">
           <td style="padding:8px; border-bottom:1px solid #f3f4f6;">{r['Ticker']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; color:{color};">{r['Señal']}</td>
+          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['Cierre']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['SMA20_ayer']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['SMA20_hoy']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['SMA5_ayer']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['SMA5_hoy']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['Rachas (ruedas)']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['Rachas (días)']}</td>
         </tr>
         """)
 
@@ -297,14 +355,11 @@ def construir_tabla_html(registros, titulo):
     </div>
     """
 
+
 tabla_cedear   = construir_tabla_html(registros_cedear,   "CEDEARs")
 tabla_acciones = construir_tabla_html(registros_acciones, "Acciones locales")
+tabla_cripto = construir_tabla_html(registros_cripto, "Cripto")
 tabla_general  = construir_tabla_html(registros_general,  "Otros")
-
-# Secciones como listas HTML
-lista_cedear   = construir_lista_html(mensajes_cedear)
-lista_acciones = construir_lista_html(mensajes_acciones)
-lista_general  = construir_lista_html(mensajes_general)
 
 html_body = f"""
 <!DOCTYPE html>
@@ -316,7 +371,7 @@ html_body = f"""
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="640" style="background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
             <tr>
               <td style="background:#0ea5e9; color:#ffffff; padding:16px 20px; font-size:18px; font-weight:bold;">
-                Resumen de tendencias (SMA5 vs SMA20)
+                Resumen de tendencias (EMA5 vs EMA20)
               </td>
             </tr>
             <tr>
@@ -327,17 +382,15 @@ html_body = f"""
 
                 {tabla_cedear}
                 {tabla_acciones}
+                {tabla_cripto}
                 {tabla_general}
 
                 <hr style="border:0; border-top:1px solid #e5e7eb; margin:16px 0;">
                 <p style="font-size:12px; color:#6b7280; margin:0;">
-                  * Señales basadas en cruce y estado de SMA5 vs SMA20 con <em>min_periods</em>.
+                  * Señales basadas en cruce y estado de EMA5 vs EMA20 con <em>min_periods</em>.
                 </p>
                 <p style="font-size:12px; color:#6b7280; margin:0;">
                   Racha (ruedas) cuenta velas (días de mercado con datos).
-                </p>
-                <p style="font-size:12px; color:#6b7280; margin:0;">
-                  Racha (días) usa calendario (puede ser > ruedas por fines de semana/feriados).
                 </p>
               </td>
             </tr>

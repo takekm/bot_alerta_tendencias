@@ -13,13 +13,13 @@ from html import escape
 tickers_cedear = [
     # Big Tech
     "AAPL.BA", "MSFT.BA", "AMZN.BA", "GOOGL.BA", "META.BA", "NVDA.BA", "TSLA.BA",
-    "NFLX.BA", "AMD.BA", "INTC.BA", "ORCL.BA",
+    "NFLX.BA", "AMD.BA", "INTC.BA", "ORCL.BA","IBM.BA",
 
     # Consumo masivo
-    "KO.BA", "PEP.BA", "PG.BA", "WMT.BA", "DIS.BA", "MCD.BA", "NKE.BA", "COST.BA",
+    "KO.BA", "PEP.BA", "PG.BA", "WMT.BA", "DISN.BA", "MCD.BA", "NKE.BA", "COST.BA",
 
     # Finanzas
-    "JPM.BA", "GS.BA", "BRK.BA", "C.BA", "BAC.BA", "AXP.BA", "V.BA", "MA.BA",
+    "JPM.BA", "GS.BA", "BRKB.BA", "C.BA", "BAC.BA", "AXP.BA", "V.BA", "MA.BA",
 
     # Energía y materias primas
     "XOM.BA", "CVX.BA", "SHEL.BA", "BP.BA", "RIO.BA", "VALE.BA", "BHP.BA",
@@ -31,7 +31,8 @@ tickers_cedear = [
     "MELI.BA", "GLOB.BA", "BABA.BA", "TSM.BA", "VIST.BA",
 
     # ETFs CEDEARs
-    "SPY.BA", "QQQ.BA", "ARKK.BA", "XLF.BA", "XLK.BA", "XLE.BA", "XLI.BA", "XLP.BA", "XLY.BA"
+    "SPY.BA", "QQQ.BA", "ARKK.BA", "XLF.BA", "XLK.BA", "XLE.BA", "XLI.BA", "XLP.BA", "XLY.BA", "IJH","IJR"
+
 ]
 
 tickers_acciones = [
@@ -40,10 +41,10 @@ tickers_acciones = [
 
     # Energía & Oil & Gas
     "YPFD.BA", "PAMP.BA", "TRAN.BA", "EDN.BA", "CEPU.BA",
-    "METR.BA", "DGCU2.BA", "VISTA.BA", "CAPX.BA",
+    "METR.BA", "DGCU2.BA", "VIST.BA", "CAPX.BA", "LAR.BA", 
 
     # Acero, materiales e industria
-    "TXAR.BA", "ALUA.BA", "ERAR.BA", "AUSO.BA", "MOLA.BA", "MOLI.BA", "LOMA.BA",
+    "TXAR.BA", "ALUA.BA", "AUSO.BA", "MOLA.BA", "MOLI.BA", "LOMA.BA",
     "HARG.BA", "CELU.BA",
 
     # Consumo & retail
@@ -139,7 +140,7 @@ for ticker in tickers:
     start=fecha_inicio_str,
     end=fecha_cierre_str,
     interval="1d",
-    #auto_adjust=True,
+    auto_adjust=True,
     progress=False,
     threads=True
     ).reset_index()
@@ -395,7 +396,7 @@ html_body = f"""
               </td>
             </tr>
           </table>
-        </td>
+        </td>""
       </tr>
     </table>
   </body>

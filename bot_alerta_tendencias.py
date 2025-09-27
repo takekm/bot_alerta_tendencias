@@ -31,7 +31,31 @@ tickers_cedear = [
     "MELI.BA", "GLOB.BA", "BABA.BA", "TSM.BA", "VIST.BA",
 
     # ETFs CEDEARs
-    "SPY.BA", "QQQ.BA", "ARKK.BA", "XLF.BA", "XLK.BA", "XLE.BA", "XLI.BA", "XLP.BA", "XLY.BA", "IJH","IJR"
+    "SPY.BA",
+    "IWM", #Empresas con bajo market cap
+    "QQQ.BA", #NASDAQ 100 con empresas tech
+    "DIA", #Dow jones industrial average 30 acciones industriales
+    "OIH", #Petróleo
+    "XLE", #Energía
+    "XLE.BA",
+    "XLI.BA",#Industria
+    "XLF", #Finanzas
+    "XLF.BA",
+    "XLK",#Tecnología
+    "XLK.BA",
+    "IYR", #Bienes Raíces
+    "XLP.BA",#Consumo básico
+    "XLY.BA",#Consumo discrecional
+    "BBH", #Biotecnología
+    "GLD", #Oro
+    "USO", #Petróleo
+    "UNG", #Gas Natural
+    "MCHI", #China
+    "EWJ", #Japón
+    "EFA", #Países Desarrollados
+    "ARKK.BA",#innovación / tecnología disruptiva    
+    "IJH", #S&P Mid-Cap
+    "IJR" #S&PSmall-Cap
 
 ]
 

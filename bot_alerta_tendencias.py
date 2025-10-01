@@ -12,53 +12,28 @@ from html import escape
 #Tickers a evaluar
 tickers_cedear = [
     # Big Tech
-    "AAPL.BA", "MSFT.BA", "AMZN.BA", "GOOGL.BA", "META.BA", "NVDA.BA", "TSLA.BA",
-    "NFLX.BA", "AMD.BA", "INTC.BA", "ORCL.BA","IBM.BA",
+    "AAPL","MSFT","AMZN","GOOGL","META","NVDA","TSLA",
+    "NFLX","AMD","INTC","ORCL","IBM",
 
     # Consumo masivo
-    "KO.BA", "PEP.BA", "PG.BA", "WMT.BA", "DISN.BA", "MCD.BA", "NKE.BA", "COST.BA",
+    "KO","PEP","PG","WMT","DIS","MCD","NKE","COST",
 
     # Finanzas
-    "JPM.BA", "GS.BA", "BRKB.BA", "C.BA", "BAC.BA", "AXP.BA", "V.BA", "MA.BA",
+    "JPM","GS","BRK-B","C","BAC","AXP","V","MA",
 
     # Energía y materias primas
-    "XOM.BA", "CVX.BA", "SHEL.BA", "BP.BA", "RIO.BA", "VALE.BA", "BHP.BA",
+    "XOM","CVX","SHEL","BP","RIO","VALE","BHP",
 
     # Salud
-    "PFE.BA", "JNJ.BA", "MRK.BA", "ABBV.BA", "LLY.BA",
+    "PFE","JNJ","MRK","ABBV","LLY",
 
     # Empresas globales con presencia local
-    "MELI.BA", "GLOB.BA", "BABA.BA", "TSM.BA", "VIST.BA",
+    "MELI","GLOB","BABA","TSM","VIST",
 
-    # ETFs CEDEARs
-    "SPY.BA",
-    "IWM", #Empresas con bajo market cap
-    "QQQ.BA", #NASDAQ 100 con empresas tech
-    "DIA", #Dow jones industrial average 30 acciones industriales
-    "OIH", #Petróleo
-    "XLE", #Energía
-    "XLE.BA",
-    "XLI.BA",#Industria
-    "XLF", #Finanzas
-    "XLF.BA",
-    "XLK",#Tecnología
-    "XLK.BA",
-    "IYR", #Bienes Raíces
-    "XLP.BA",#Consumo básico
-    "XLY.BA",#Consumo discrecional
-    "BBH", #Biotecnología
-    "GLD", #Oro
-    "USO", #Petróleo
-    "UNG", #Gas Natural
-    "MCHI", #China
-    "EWJ", #Japón
-    "EFA", #Países Desarrollados
-    "ARKK.BA",#innovación / tecnología disruptiva    
-    "IJH", #S&P Mid-Cap
-    "IJR" #S&PSmall-Cap
-
+    # ETFs
+    "SPY","IWM","QQQ","DIA","OIH","XLE","XLI","XLF","XLK","IYR",
+    "XLP","XLY","BBH","GLD","USO","UNG","MCHI","EWJ","EFA","ARKK","IJH","IJR"
 ]
-
 tickers_acciones = [
     # Bancos
     "GGAL.BA", "BMA.BA", "SUPV.BA", "BBAR.BA", "BPAT.BA", "BRIO.BA",

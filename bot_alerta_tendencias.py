@@ -5,9 +5,11 @@ import numpy as np
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 import datetime
 from datetime import timedelta
 from html import escape
+from io import BytesIO
 
 #Tickers a evaluar
 tickers_cedear = [
@@ -36,7 +38,7 @@ tickers_cedear = [
 ]
 tickers_acciones = [
     # Bancos
-    "GGAL.BA", "BMA.BA", "SUPV.BA", "BBAR.BA", "BPAT.BA", "BRIO.BA",
+    "GGAL.BA", "BMA.BA", "SUPV.BA", "BBAR.BA", "BRIO.BA",
 
     # Energía & Oil & Gas
     "YPFD.BA", "PAMP.BA", "TRAN.BA", "EDN.BA", "CEPU.BA",
@@ -62,13 +64,7 @@ tickers_acciones = [
 ]
 
 tickers_cripto = [
-    "BTC-USD", "ETH-USD", "BNB-USD",
-    "XRP-USD", "SOL-USD", "ADA-USD", "DOGE-USD", "TRX-USD",
-    "DOT-USD", "AVAX-USD", "BCH-USD",
-    "LTC-USD", "MATIC-USD", "LINK-USD", "XLM-USD",
-    "ATOM-USD", "ETC-USD", "XMR-USD", "NEAR-USD", 
-    "OP-USD", "INJ-USD", "SUI-USD", "HBAR-USD",
-    "MKR-USD", "AAVE-USD", "IMX-USD", "FIL-USD", "ICP-USD"
+    "BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD"
 ]
 
 tickers= tickers_cedear +  tickers_acciones +  tickers_cripto
@@ -107,22 +103,43 @@ def formatear_numero(valor):
         return "Sin Dato"
 
 
-
 #Función para generar una tabla resumen consolidada de todos los tickers
-def agregar_registro(a_que_lista, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas=None):
+def agregar_registro(a_que_lista, ticker, señal, cierre, Var_nominal, Var_pct, cruce , RSI14,streak_ruedas=None):
     a_que_lista.append({
         "Ticker": ticker,
         "Señal": señal,
         "Cierre": cierre,
-        "SMA20_ayer": SMALP_LD,
-        "SMA20_hoy":  SMALP_TD,
-        "SMA5_ayer":  SMACP_LD,
-        "SMA5_hoy":   SMACP_TD,
+        "vs LD $":Var_nominal,
+        "vs LD %": Var_pct,
+        "cruce":  cruce,
         "Rachas (ruedas)": streak_ruedas if streak_ruedas is not None else "—",
+        "RSI14":  RSI14
     })
 
+#Calculador de RSI
+def rsi_wilder(close, window=14):
+    delta = close.diff()
 
-#df vacío para alojar los datos concatenados
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+
+    # Inicialización con medias simples, luego suavizado tipo Wilder
+    avg_gain = gain.rolling(window=window, min_periods=window).mean()
+    avg_loss = loss.rolling(window=window, min_periods=window).mean()
+
+    # A partir de la 1ra ventana, usar la recursión de Wilder
+    avg_gain = avg_gain.combine_first(
+        gain.ewm(alpha=1/window, adjust=False).mean()
+    )
+    avg_loss = avg_loss.combine_first(
+        loss.ewm(alpha=1/window, adjust=False).mean()
+    )
+
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+    #df vacío para alojar los datos concatenados
 df_precios_concatenado=pd.DataFrame()
 
 # Registros tabulares (además de los mensajes de texto)
@@ -131,8 +148,6 @@ registros_acciones = []
 registros_cripto = []
 registros_general  = []
 
-
-#Recorremos cada ticker
 for ticker in tickers:
     data = yf.download(    
     ticker,
@@ -144,9 +159,6 @@ for ticker in tickers:
     threads=True
     ).reset_index()
     data.columns = data.columns.get_level_values(0)
-    # 1) No romper si no hay datos
-    if data is None or data.empty:
-        continue
 
     df = data.reset_index().copy()
     df["Ticker"] = ticker
@@ -157,118 +169,145 @@ for ticker in tickers:
     df["EMA5"]  = df["Close"].ewm(span=5,  adjust=False, min_periods=5).mean()
     df["EMA20"] = df["Close"].ewm(span=20, adjust=False, min_periods=20).mean()
 
+    df["Cruce"] = np.where(
+    (df["EMA5"].shift(1) < df["EMA20"].shift(1)) & (df["EMA5"] > df["EMA20"]),
+    "Cambio a Alcista",  # Cruce hacia arriba
+    np.where(
+        (df["EMA5"].shift(1) > df["EMA20"].shift(1)) & (df["EMA5"] < df["EMA20"]),
+        "Cambio a Bajista",  # Cruce hacia abajo
+        np.where(
+            (df["EMA5"] > df["EMA20"]),
+            "Alcista",  # EMA5 sigue arriba
+            np.where(
+                (df["EMA5"] < df["EMA20"]),
+                "Bajista",  # EMA5 sigue abajo
+                np.nan
+                )
+            )
+        )
+    )
+
+    # 1) Definimos cuándo EMA5 está arriba/abajo (True/False)
+    mask = df["EMA5"].notna() & df["EMA20"].notna() #Crea un booleano por fila que vale True solo donde ambas EMAs existen (evita los NaN de los primeros días).
+    up = df.loc[mask, "EMA5"] > df.loc[mask, "EMA20"]   # True=Alcista, False=Bajista
+
+    # 2) Identificamos grupos consecutivos (cada cambio True<->False inicia grupo nuevo)
+    grp = (up != up.shift()).cumsum() #up.shift() corre la serie 1 hacia abajo (compara “hoy” con “ayer”). - cumsum() acumula esos cambios y crea un ID de grupo para cada tramo consecutivo de la misma condición.
+
+    # 3) Racha de días dentro de cada grupo (1,2,3,...)
+    df.loc[mask, "Racha_dias"] = up.groupby(grp).cumcount() + 1 #groupby(grp).cumcount() cuenta 0,1,2,… dentro de cada grupo.
+    df["Racha_dias"] = df["Racha_dias"].astype("Int64")
+
+    # 4) Variación nominal y porcentual vs. el día anterior
+    df["Var_nominal"] = df["Close"].diff()              # Close_t - Close_{t-1}
+    df["Var_pct"]     = df["Close"].pct_change() * 100  # % respecto al cierre anterior
+
+    # 5) Calculador RSI
+    df["RSI14"] = rsi_wilder(df["Close"], 14)
+
+    #Señal de compra
+    N = 3  # ventana para aceptar el cruce de RSI
+    # 1) Cruce alcista de EMAs hoy (ayer EMA5<=EMA20 y hoy EMA5>EMA20)
+    cruce_alcista = (df["EMA5"].shift(1) <= df["EMA20"].shift(1)) & (df["EMA5"] > df["EMA20"])
+    # 2) RSI cruza 30 hacia arriba (ayer <30 y hoy >=30)
+    rsi_sale_30 = (df["RSI14"].shift(1) < 30) & (df["RSI14"] >= 30)
+    # 3) Aceptar si el cruce de RSI ocurrió hoy o en las N-1 barras anteriores
+    rsi_sale_30_rolling = rsi_sale_30.rolling(N, min_periods=1).max().astype(bool)
+    # 4) Señal de compra
+    df["BUY"] = cruce_alcista & rsi_sale_30_rolling
+
+    #Señal de Salida
+    # Señal de venta básica
+    cruce_bajista = (df["EMA5"].shift(1) >= df["EMA20"].shift(1)) & (df["EMA5"] < df["EMA20"])
+    sobrecompra = (df["RSI14"] > 70)
+    df["SELL"] = cruce_bajista | sobrecompra
+
     if len(df.tail(2))>=2:
         SMALP_LD =df["EMA20"].iloc[-2]
         SMACP_LD=df["EMA5"].iloc[-2]
     else:
         SMALP_LD ="Sin Dato"
         SMACP_LD= "Sin Dato"
-    
+        
     if len(df.tail(2))>=1:
         SMALP_TD =df["EMA20"].iloc[-1]
         SMACP_TD=df["EMA5"].iloc[-1]
         cierre=df["Close"].iloc[-1]
+        cruce=df["Cruce"].iloc[-1]
+        racha=df["Racha_dias"].iloc[-1]
+        Var_nominal=df["Var_nominal"].iloc[-1]
+        Var_pct=df["Var_pct"].iloc[-1]
+        RSI14=df["RSI14"].iloc[-1]
+        BUY=df["BUY"].iloc[-1]
+        SELL=df["SELL"].iloc[-1]
+        
     else:
         SMALP_TD ="Sin Dato"
         SMACP_TD= "Sin Dato"
         cierre="Sin Dato"
-    
+        cruce="Sin Dato"
+        racha="Sin Dato"
+        Var_nominal="Sin Dato"
+        Var_pct="Sin Dato"
+        RSI14="Sin Dato"
+        BUY="Sin Dato"
+        SELL="Sin Dato"
+        
     #Formateamos 
     SMALP_LD=formatear_numero(SMALP_LD)
     SMACP_LD=formatear_numero(SMACP_LD)
     SMALP_TD=formatear_numero(SMALP_TD)
     SMACP_TD=formatear_numero(SMACP_TD)
     cierre=formatear_numero(cierre)
-
-    # 3) Estado solo donde haya ambas SMAs
-    estado = pd.Series(index=df.index, dtype="object")
-    mask_ok = df["EMA5"].notna() & df["EMA20"].notna()
-    estado[mask_ok] = np.where(df.loc[mask_ok, "EMA5"] > df.loc[mask_ok, "EMA20"], "Alcista", "Bajista")
-
-    # --- cálculo de streak del estado actual ---
-    estado_valid   = estado[mask_ok]                  # solo donde hay EMA5 y EMA20
-    fechas_valid   = df.loc[mask_ok, "Date"]
-
-    if estado_valid.dropna().empty:
-        streak_ruedas = None
-        
+    racha=formatear_numero(racha)
+    Var_nominal=formatear_numero(Var_nominal)
+    Var_pct=formatear_numero(Var_pct)
+    RSI14=formatear_numero(RSI14)
+    
+    if SELL==True:
+        señal="VENDER"
+        if ticker in tickers_cedear:
+            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce, racha, RSI14)
+        elif ticker in tickers_acciones:
+            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
+        elif ticker in tickers_cripto:
+            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
+        else:
+            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
+    elif BUY==True:
+        señal="COMPRAR"
+        if ticker in tickers_cedear:
+            
+            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
+        elif ticker in tickers_acciones:
+            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
+        elif ticker in tickers_cripto:
+            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
+        else:
+            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
+    elif (SELL==False) & (BUY==False) & (cruce=="Bajista"):
+        señal="Se mantiene Bajista"
+        if ticker in tickers_cedear:
+            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
+        elif ticker in tickers_acciones:
+            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
+        elif ticker in tickers_cripto:
+            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
+        else:
+            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
     else:
-        # Agrupar por rachas consecutivas (run-length encoding)
-        grupos = (estado_valid != estado_valid.shift()).cumsum()
-        tamanio_grupo = grupos.groupby(grupos).transform("size")
-        # Racha actual = tamaño del último grupo
-        streak_ruedas = int(tamanio_grupo.iloc[-1])
-
-
-
-    # 4) Tomar los últimos DOS estados válidos
-    ult2 = estado.dropna().tail(2)
-   
-
-    if len(ult2) < 2:
-        
-        # igual acumulá el df si lo usás después
-        df_precios_concatenado = pd.concat([df_precios_concatenado, df], ignore_index=True)
-        continue
-
-    prev, curr = ult2.iloc[-2], ult2.iloc[-1]
-
-    if prev == "Alcista" and curr == "Bajista":
+        señal="Se mantiene Alcista"
         if ticker in tickers_cedear:
-            señal="Inicio de tendencia Bajista → VENDER"
-            agregar_registro(registros_cedear, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
+            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         elif ticker in tickers_acciones:
-            señal="Inicio de tendencia Bajista → VENDER"
-            agregar_registro(registros_acciones, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
+            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         elif ticker in tickers_cripto:
-            señal="Inicio de tendencia Bajista → VENDER"
-            agregar_registro(registros_cripto, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
+            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         else:
-            señal="Inicio de tendencia Bajista → VENDER"
-            agregar_registro(registros_general, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-    elif prev == "Bajista" and curr == "Alcista":
-        if ticker in tickers_cedear:
-            señal="Inicio de tendencia Alcista → COMPRAR"
-            agregar_registro(registros_cedear, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-        elif ticker in tickers_acciones:
-            señal="Inicio de tendencia Alcista → COMPRAR"
-            agregar_registro(registros_acciones, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-        elif ticker in tickers_cripto:
-            señal="Inicio de tendencia Alcista → COMPRAR"
-            agregar_registro(registros_cripto, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-        else:
-            señal="Inicio de tendencia Alcista → COMPRAR"
-            agregar_registro(registros_general, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-    elif prev == "Bajista" and curr == "Bajista":
-        if ticker in tickers_cedear:
-            señal="Se mantiene Bajista"
-            agregar_registro(registros_cedear, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-        elif ticker in tickers_acciones:
-            señal="Se mantiene Bajista"
-            agregar_registro(registros_acciones, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-        elif ticker in tickers_cripto:
-            señal="Se mantiene Bajista"
-            agregar_registro(registros_cripto, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-        else:
-            señal="Se mantiene Bajista"
-            agregar_registro(registros_general, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-    else:
-        if ticker in tickers_cedear:
-            señal="Se mantiene Alcista"
-            agregar_registro(registros_cedear, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-        elif ticker in tickers_acciones:
-            señal="Se mantiene Alcista"
-            agregar_registro(registros_acciones, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-        elif ticker in tickers_cripto:
-            señal="Se mantiene Alcista"
-            agregar_registro(registros_cripto, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
-        else:
-            señal="Se mantiene Alcista"
-            agregar_registro(registros_general, ticker, señal, cierre, SMALP_LD, SMALP_TD, SMACP_LD, SMACP_TD,streak_ruedas)
+            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
 
 
     df_precios_concatenado = pd.concat([df_precios_concatenado, df], ignore_index=True)
-
 
 def construir_lista_html(items):
     """Convierte una lista de strings en <li> con color según la señal."""
@@ -306,14 +345,15 @@ def construir_tabla_html(registros, titulo):
         <th style="text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;">Ticker</th>
         <th style="text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;">Señal</th>
         <th style="text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;">Cierre</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">EMA20 ayer</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">EMA20 hoy</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">EMA5 ayer</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">EMA5 hoy</th>
+        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">vs LD $</th>
+        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">vs LD %</th>
+        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">cruce</th>
         <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">Racha (ruedas)</th>
+        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">RSI14</th>
       </tr>
     </thead>
     """
+    
 
     filas = []
     for r in registros:
@@ -335,11 +375,11 @@ def construir_tabla_html(registros, titulo):
           <td style="padding:8px; border-bottom:1px solid #f3f4f6;">{r['Ticker']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; color:{color};">{r['Señal']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['Cierre']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['SMA20_ayer']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['SMA20_hoy']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['SMA5_ayer']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['SMA5_hoy']}</td>
+          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['vs LD $']}</td>
+          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['vs LD %']}%</td>
+          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['cruce']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['Rachas (ruedas)']}</td>
+          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['RSI14']}</td>
         </tr>
         """)
 
@@ -402,17 +442,31 @@ html_body = f"""
 </html>
 """
 
-# Cuerpo del correo
+# Adjuntar HTML
 mensaje.attach(MIMEText(html_body, "html"))
+
+# === Adjuntar Excel ANTES de enviar ===
+fname = f"precios_{fecha_hoy_str.replace('/','-').replace(':','-')}.xlsx"
+buffer = BytesIO()
+with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+    df_precios_concatenado.to_excel(writer, index=False, sheet_name="Precios")
+    wb = writer.book; ws = writer.sheets["Precios"]
+    nrows, ncols = df_precios_concatenado.shape
+    ws.autofilter(0, 0, nrows, ncols-1)
+    for i, col in enumerate(df_precios_concatenado.columns):
+        ws.set_column(i, i, max(10, min(35, len(str(col)) + 2)))
+buffer.seek(0)
+adjunto = MIMEApplication(buffer.read(), _subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+adjunto.add_header("Content-Disposition", "attachment", filename=fname)
+mensaje.attach(adjunto)
+
+# === Enviar ===
 try:
-    # Conectar al servidor SMTP
     servidor = smtplib.SMTP(smtp_server, smtp_port)
-    servidor.starttls()  # Seguridad TLS
+    servidor.starttls()
     servidor.login(remitente, password)
     servidor.send_message(mensaje)
     servidor.quit()
     print(f"Correo enviado exitosamente {destinatario}  ✅")
 except Exception as e:
     print(f"Error al enviar el correo: {e}")
-
-    

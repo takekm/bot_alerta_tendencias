@@ -104,7 +104,7 @@ def formatear_numero(valor):
 
 
 #Función para generar una tabla resumen consolidada de todos los tickers
-def agregar_registro(a_que_lista, ticker, señal, cierre, Var_nominal, Var_pct, cruce , RSI14,streak_ruedas=None):
+def agregar_registro(a_que_lista, ticker, señal, cierre, Var_nominal, Var_pct, cruce , racha, RSI14):
     a_que_lista.append({
         "Ticker": ticker,
         "Señal": señal,
@@ -112,7 +112,7 @@ def agregar_registro(a_que_lista, ticker, señal, cierre, Var_nominal, Var_pct, 
         "vs LD $":Var_nominal,
         "vs LD %": Var_pct,
         "cruce":  cruce,
-        "Rachas (ruedas)": streak_ruedas if streak_ruedas is not None else "—",
+        "Rachas (ruedas)": "—" if pd.isna(racha) else racha,
         "RSI14":  RSI14
     })
 
@@ -181,7 +181,7 @@ for ticker in tickers:
             np.where(
                 (df["EMA5"] < df["EMA20"]),
                 "Bajista",  # EMA5 sigue abajo
-                np.nan
+                "Sin Dato"
                 )
             )
         )
@@ -259,7 +259,6 @@ for ticker in tickers:
     SMALP_TD=formatear_numero(SMALP_TD)
     SMACP_TD=formatear_numero(SMACP_TD)
     cierre=formatear_numero(cierre)
-    racha=formatear_numero(racha)
     Var_nominal=formatear_numero(Var_nominal)
     Var_pct=formatear_numero(Var_pct)
     RSI14=formatear_numero(RSI14)
@@ -435,7 +434,7 @@ html_body = f"""
               </td>
             </tr>
           </table>
-        </td>""
+        </td>
       </tr>
     </table>
   </body>

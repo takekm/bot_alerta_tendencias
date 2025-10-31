@@ -220,7 +220,7 @@ for ticker in tickers:
     # Señal de venta básica
     cruce_bajista = (df["EMA5"].shift(1) >= df["EMA20"].shift(1)) & (df["EMA5"] < df["EMA20"])
     sobrecompra = (df["RSI14"] > 70)
-    df["SELL"] = cruce_bajista | sobrecompra
+    df["SELL"] = cruce_bajista #| sobrecompra
 
     if len(df.tail(2))>=2:
         SMALP_LD =df["EMA20"].iloc[-2]

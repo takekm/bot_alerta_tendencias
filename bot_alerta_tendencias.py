@@ -254,8 +254,10 @@ for ticker in tickers:
         df["dolar_ccl_ticker"] = pd.to_numeric(df["dolar_ccl_ticker"]).astype(float)
         #Calculo la diferencia
         df["dif_dolar_cedear_vs_ccl"]=df["dolar_ccl_hoy_mercado"]-df['dolar_ccl_ticker']
-        #Defino si el dólar ccl del cedear está barato o caro respecto a la cotización del mercado
-        df["compra_dolar_ccl_ticker"]=np.where(df["dolar_ccl_ticker"]<=df["dolar_ccl_hoy_mercado"],"BARATO","CARO")
+        # Defino si el dólar CCL del CEDEAR está barato o caro respecto a la cotización del mercado
+        df["compra_dolar_ccl_ticker"] = "CARO"
+        mask_barato = df["dolar_ccl_ticker"] <= df["dolar_ccl_hoy_mercado"]
+        df.loc[mask_barato, "compra_dolar_ccl_ticker"] = "BARATO"
     
     else:
         # Si no hay CEDEAR asociado, dejo NaN o valores neutros

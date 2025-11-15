@@ -3,8 +3,3 @@ numpy
 yfinance
 requests
 xlsxwriter
-smtplib
-datetime
-email.mime.multipart
-email.mime.text
-email.mime.application

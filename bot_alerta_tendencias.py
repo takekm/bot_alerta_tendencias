@@ -280,7 +280,7 @@ for ticker in tickers:
             np.where(
                 (df["EMA5"] < df["EMA20"]),
                 "Bajista",  # EMA5 sigue abajo
-                np.nan
+                "Sin Dato"
                 )
             )
         )

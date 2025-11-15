@@ -268,23 +268,32 @@ for ticker in tickers:
     df["EMA5"]  = df["Close"].ewm(span=5,  adjust=False, min_periods=5).mean()
     df["EMA20"] = df["Close"].ewm(span=20, adjust=False, min_periods=20).mean()
 
-    df["Cruce"] = np.where(
-    (df["EMA5"].shift(1) < df["EMA20"].shift(1)) & (df["EMA5"] > df["EMA20"]),
-    "Cambio a Alcista",  # Cruce hacia arriba
-    np.where(
-        (df["EMA5"].shift(1) > df["EMA20"].shift(1)) & (df["EMA5"] < df["EMA20"]),
-        "Cambio a Bajista",  # Cruce hacia abajo
-        np.where(
-            (df["EMA5"] > df["EMA20"]),
-            "Alcista",  # EMA5 sigue arriba
-            np.where(
-                (df["EMA5"] < df["EMA20"]),
-                "Bajista",  # EMA5 sigue abajo
-                "Sin Dato"
-                )
-            )
-        )
+    # Inicializo Cruce como string
+    df["Cruce"] = "Sin dato"
+
+    mask_valid = df["EMA5"].notna() & df["EMA20"].notna()
+
+    cond_cruce_alcista = (
+        mask_valid &
+        (df["EMA5"].shift(1) < df["EMA20"].shift(1)) &
+        (df["EMA5"] > df["EMA20"])
     )
+
+    cond_cruce_bajista = (
+        mask_valid &
+        (df["EMA5"].shift(1) > df["EMA20"].shift(1)) &
+        (df["EMA5"] < df["EMA20"])
+    )
+
+    cond_alcista = mask_valid & (df["EMA5"] > df["EMA20"])
+    cond_bajista = mask_valid & (df["EMA5"] < df["EMA20"])
+
+    df.loc[cond_cruce_alcista, "Cruce"] = "Cambio a Alcista"
+    df.loc[cond_cruce_bajista, "Cruce"] = "Cambio a Bajista"
+
+    # Solo si no hubo cruce, marco tendencia
+    df.loc[cond_alcista & (df["Cruce"] == "Sin dato"), "Cruce"] = "Alcista"
+    df.loc[cond_bajista & (df["Cruce"] == "Sin dato"), "Cruce"] = "Bajista"
 
     # 1) Definimos cuándo EMA5 está arriba/abajo (True/False)
     mask = df["EMA5"].notna() & df["EMA20"].notna() #Crea un booleano por fila que vale True solo donde ambas EMAs existen (evita los NaN de los primeros días).
@@ -319,7 +328,7 @@ for ticker in tickers:
     # Señal de venta básica
     cruce_bajista = (df["EMA5"].shift(1) >= df["EMA20"].shift(1)) & (df["EMA5"] < df["EMA20"])
     sobrecompra = (df["RSI14"] > 70)
-    df["SELL"] = cruce_bajista | sobrecompra
+    df["SELL"] = cruce_bajista
 
     if len(df.tail(2))>=2:
         SMALP_LD =df["EMA20"].iloc[-2]
@@ -413,8 +422,6 @@ for ticker in tickers:
 
     df_precios_concatenado = pd.concat([df_precios_concatenado, df], ignore_index=True)
 
-
-
 def construir_lista_html(items):
     """Convierte una lista de strings en <li> con color según la señal."""
     if not items:
@@ -441,9 +448,8 @@ def construir_tabla_html(registros, titulo):
     if not registros:
         return f"""
         <h3 style="margin:16px 0 8px 0; color:#111827;">{titulo}</h3>
-        <div style="color:#6b7280; font-size:14px; margin:8px 0 16px 0;">— Sin señales —</div>
+        <div style="color:#6b7280; font-size:14px; margin:8px 0 16px 0;">—Sin señales—</div>
         """
-
     # Estilo de la tabla
     thead = """
     <thead>
@@ -461,8 +467,6 @@ def construir_tabla_html(registros, titulo):
       </tr>
     </thead>
     """
-    
-
     filas = []
     for r in registros:
         señal_low = r["Señal"].lower()
@@ -492,7 +496,7 @@ def construir_tabla_html(registros, titulo):
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['dif_ccl_vs_mercado']}</td>
         </tr>
         """)
-
+        
     tbody = f"<tbody>{''.join(filas)}</tbody>"
 
     return f"""
@@ -504,7 +508,6 @@ def construir_tabla_html(registros, titulo):
       </table>
     </div>
     """
-
 
 tabla_cedear   = construir_tabla_html(registros_cedear,   "CEDEARs")
 tabla_acciones = construir_tabla_html(registros_acciones, "Acciones locales")

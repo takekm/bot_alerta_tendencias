@@ -324,7 +324,7 @@ for ticker in tickers:
     # 3) Aceptar si el cruce de RSI ocurrió hoy o en las N-1 barras anteriores
     rsi_sale_30_rolling = rsi_sale_30.rolling(N, min_periods=1).max().astype(bool)
     # 4) Señal de compra
-    df["BUY"] = cruce_alcista & rsi_sale_30_rolling
+    df["BUY"] = cruce_alcista #& rsi_sale_30_rolling
 
     #Señal de Salida
     # Señal de venta básica
@@ -559,6 +559,7 @@ html_body = f"""
 
 # Adjuntar HTML
 mensaje.attach(MIMEText(html_body, "html"))
+
 
 # === Adjuntar Excel ANTES de enviar ===
 fname = f"precios_{fecha_hoy_str.replace('/','-').replace(':','-')}.xlsx"

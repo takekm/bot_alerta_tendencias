@@ -111,7 +111,7 @@ tickers_acciones = [
 ]
 
 tickers_cripto = [
-    "BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD"
+    "BTC-USD", "ETH-USD"
 ]
 
 tickers= tickers_cedear +  tickers_acciones +  tickers_cripto

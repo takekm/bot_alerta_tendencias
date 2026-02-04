@@ -6,62 +6,15 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
-#import datetime
-from datetime import timedelta, datetime, date
+import datetime
+from datetime import timedelta
 from html import escape
 from io import BytesIO
-import requests
-
-
-
-DOLARAPI_BASE = "https://dolarapi.com/v1/dolares"
-
-ENDPOINTS = {
-    "blue":    f"{DOLARAPI_BASE}/blue",
-    "oficial": f"{DOLARAPI_BASE}/oficial",   # minorista
-    "mep":     f"{DOLARAPI_BASE}/bolsa",
-    "ccl":     f"{DOLARAPI_BASE}/contadoconliqui",
-    # Extras disponibles si querés: "ccl", "mayorista", "tarjeta", "qatar", etc.
-}
-
-def _get_json(url, timeout=8):
-    r = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
-    r.raise_for_status()
-    return r.json()
-
-def cotizaciones_dolarapi():
-    """Devuelve dict con mep, blue y oficial_minorista (valores de venta, ARS/USD)."""
-    j_blue    = _get_json(ENDPOINTS["blue"])
-    j_oficial = _get_json(ENDPOINTS["oficial"])
-    j_mep     = _get_json(ENDPOINTS["mep"])
-    j_ccl     = _get_json(ENDPOINTS["ccl"])
-
-    data = {
-        "blue": float(j_blue["venta"]),
-        "oficial_minorista": float(j_oficial["venta"]),
-        "mep": float(j_mep["venta"]),
-        "ccl": float(j_ccl["venta"]),
-        "timestamp": datetime.now().isoformat(timespec="seconds"),
-        "fuente": "dolarapi.com"
-    }
-    return data
-
-#Capturar el valor del dólar
-if __name__ == "__main__":
-    try:
-        data_api = cotizaciones_dolarapi()
-        blue = data_api["blue"]
-        mep = data_api["mep"]
-        oficial = data_api["oficial_minorista"]
-        ccl=data_api["ccl"]
-        print(data_api)  
-    except Exception as e:
-        print("Error obteniendo cotizaciones:", e)
 
 #Tickers a evaluar
 tickers_cedear = [
     # Big Tech
-    "AAPL","MSFT","AMZN","GOOGL","META","NVDA","TSLA",
+    "AAPL","MSFT","AMZN","GOOGL","META","NVDA",
     "NFLX","AMD","INTC","ORCL","IBM",
 
     # Consumo masivo
@@ -72,6 +25,9 @@ tickers_cedear = [
 
     # Energía y materias primas
     "XOM","CVX","SHEL","BP","RIO","VALE","BHP",
+
+    #Automotriz
+    'TSLA', 'TM', 'F', 'GM', 'HMC','VOWG','MBG', 'BMW','RNO','BYDDY',
 
     # Salud
     "PFE","JNJ","MRK","ABBV","LLY",
@@ -102,10 +58,6 @@ tickers_acciones = [
     # Telecomunicaciones & tecnología
     "TECO2.BA", "CTIO.BA", "COME.BA",
 
-    # Seguros, servicios & otros
-    "VALO.BA", "IRSA.BA", "IRCP.BA", "CVH.BA", "EDLH.BA", "POLL.BA",
-    "OEST.BA", "GAMI.BA", "GRIM.BA",
-
     # Panel General con buen volumen
     "BOLT.BA", "RICH.BA", "SAMI.BA"
 ]
@@ -117,9 +69,9 @@ tickers_cripto = [
 tickers= tickers_cedear +  tickers_acciones +  tickers_cripto
 
 #Declaramos fechas
-fecha_hoy = date.today()
+fecha_hoy = datetime.date.today()
 fecha_cierre = fecha_hoy+ timedelta(days=1) #Agregar un día porque la descarga de yfinance es exclusivo en su límite superior.
-fecha_inicio = fecha_cierre - timedelta(days=180)
+fecha_inicio = fecha_cierre - datetime.timedelta(days=180)
 #Pasamos a string
 fecha_hoy_str=fecha_hoy.strftime("%Y-%m-%d")
 fecha_cierre_str=fecha_cierre.strftime("%Y-%m-%d")
@@ -136,9 +88,6 @@ mensaje["From"] = "BOT Python - Take"
 mensaje["To"] = destinatario
 mensaje["Subject"] = "Resumen de tendencias"
 
-#Valor del dolar
-dolar_ccl_api=data_api["ccl"]
-
 #Funcón para formatear separadores de miles con . y decimales con ,
 def formatear_numero(valor):
     try:
@@ -154,7 +103,7 @@ def formatear_numero(valor):
 
 
 #Función para generar una tabla resumen consolidada de todos los tickers
-def agregar_registro(a_que_lista, ticker, señal, cierre, Var_nominal, Var_pct, cruce ,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado):
+def agregar_registro(a_que_lista, ticker, señal, cierre, Var_nominal, Var_pct, cruce , racha, RSI14):
     a_que_lista.append({
         "Ticker": ticker,
         "Señal": señal,
@@ -162,10 +111,8 @@ def agregar_registro(a_que_lista, ticker, señal, cierre, Var_nominal, Var_pct, 
         "vs LD $":Var_nominal,
         "vs LD %": Var_pct,
         "cruce":  cruce,
-        "Rachas (ruedas)": racha,
-        "RSI14":  RSI14, 
-        "CCL": dolar_ccl,
-        "dif_ccl_vs_mercado": dif_ccl_vs_mercado
+        "Rachas (ruedas)": "—" if pd.isna(racha) else racha,
+        "RSI14":  RSI14
     })
 
 #Calculador de RSI
@@ -200,13 +147,9 @@ registros_acciones = []
 registros_cripto = []
 registros_general  = []
 
-#Importar excel con valores de ratio
-df_ratio=pd.read_excel("./inputs/ratio.xlsx")
-
 for ticker in tickers:
     data = yf.download(    
     ticker,
-    #"AAPL",
     start=fecha_inicio_str,
     end=fecha_cierre_str,
     interval="1d",
@@ -221,81 +164,27 @@ for ticker in tickers:
     df["Date"] = pd.to_datetime(df["Date"])
     df = df.sort_values("Date")
 
-    #Me trigo info de los ratios y su análogo en cedear
-    df=pd.merge(df,df_ratio, on="Ticker",how='left')
-    ticker_ba=df["ticker_ba"].iloc[0]
-    
-    if pd.notna(ticker_ba):
-        #Me descargo datos de cierre del análogo en cedear si hay dato válido de ticker BA
-        data_ba = yf.download(    
-        ticker_ba,
-        start=fecha_inicio_str,
-        end=fecha_cierre_str,
-        interval="1d",
-        auto_adjust=True,
-        progress=False,
-        threads=True
-        ).reset_index()
-        data_ba.columns = data_ba.columns.get_level_values(0)
-
-        data_ba=data_ba[["Date","Close"]]
-        data_ba["ticker_ba"]=ticker_ba
-        data_ba = data_ba.rename(columns={"Close": "Close_ba"})
-
-        #Merge con el df principal
-        df=pd.merge(df,data_ba, on=["ticker_ba","Date"],how='left')
-
-        #Genero una columna con el valor del dólar ccl de hoy en el mercado
-        df["dolar_ccl_hoy_mercado"]=dolar_ccl_api
-        #Busco cuánto vale el ccl del ticker
-        df["dolar_ccl_ticker"]=(df["Close_ba"]*df["ratio"])/df["Close"]
-        #Aseguro tipo de dato previo a la operación matemática para el cálculo de dif
-        df["dolar_ccl_hoy_mercado"] = pd.to_numeric(df["dolar_ccl_hoy_mercado"]).astype(float)
-        df["dolar_ccl_ticker"] = pd.to_numeric(df["dolar_ccl_ticker"]).astype(float)
-        #Calculo la diferencia
-        df["dif_dolar_cedear_vs_ccl"]=df["dolar_ccl_hoy_mercado"]-df['dolar_ccl_ticker']
-        # Defino si el dólar CCL del CEDEAR está barato o caro respecto a la cotización del mercado
-        df["compra_dolar_ccl_ticker"] = "CARO"
-        mask_barato = df["dolar_ccl_ticker"] <= df["dolar_ccl_hoy_mercado"]
-        df.loc[mask_barato, "compra_dolar_ccl_ticker"] = "BARATO"
-    
-    else:
-        # Si no hay CEDEAR asociado, dejo NaN o valores neutros
-        df["dolar_ccl_hoy_mercado"] = float(dolar_ccl_api)
-        df["dolar_ccl_ticker"] = np.nan
-        df["dif_dolar_cedear_vs_ccl"] = np.nan
-        df["compra_dolar_ccl_ticker"] = np.nan
-
     # 2) SMAs con min_periods para evitar señales prematuras
     df["EMA5"]  = df["Close"].ewm(span=5,  adjust=False, min_periods=5).mean()
     df["EMA20"] = df["Close"].ewm(span=20, adjust=False, min_periods=20).mean()
 
-    # Inicializo Cruce como string
-    df["Cruce"] = "Sin dato"
-
-    mask_valid = df["EMA5"].notna() & df["EMA20"].notna()
-
-    cond_cruce_alcista = (
-        mask_valid &
-        (df["EMA5"].shift(1) < df["EMA20"].shift(1)) &
-        (df["EMA5"] > df["EMA20"])
+    df["Cruce"] = np.where(
+    (df["EMA5"].shift(1) < df["EMA20"].shift(1)) & (df["EMA5"] > df["EMA20"]),
+    "Cambio a Alcista",  # Cruce hacia arriba
+    np.where(
+        (df["EMA5"].shift(1) > df["EMA20"].shift(1)) & (df["EMA5"] < df["EMA20"]),
+        "Cambio a Bajista",  # Cruce hacia abajo
+        np.where(
+            (df["EMA5"] > df["EMA20"]),
+            "Alcista",  # EMA5 sigue arriba
+            np.where(
+                (df["EMA5"] < df["EMA20"]),
+                "Bajista",  # EMA5 sigue abajo
+                "Sin Dato"
+                )
+            )
+        )
     )
-
-    cond_cruce_bajista = (
-        mask_valid &
-        (df["EMA5"].shift(1) > df["EMA20"].shift(1)) &
-        (df["EMA5"] < df["EMA20"])
-    )
-
-    cond_alcista = mask_valid & (df["EMA5"] > df["EMA20"])
-    cond_bajista = mask_valid & (df["EMA5"] < df["EMA20"])
-
-    df.loc[cond_cruce_alcista, "Cruce"] = "Cambio a Alcista"
-    df.loc[cond_cruce_bajista, "Cruce"] = "Cambio a Bajista"
-
-    # Solo si no hubo cruce, marco tendencia
-    df.loc[cond_alcista & (df["Cruce"] == "Sin dato"), "Cruce"] = "Alcista"
-    df.loc[cond_bajista & (df["Cruce"] == "Sin dato"), "Cruce"] = "Bajista"
 
     # 1) Definimos cuándo EMA5 está arriba/abajo (True/False)
     mask = df["EMA5"].notna() & df["EMA20"].notna() #Crea un booleano por fila que vale True solo donde ambas EMAs existen (evita los NaN de los primeros días).
@@ -324,13 +213,13 @@ for ticker in tickers:
     # 3) Aceptar si el cruce de RSI ocurrió hoy o en las N-1 barras anteriores
     rsi_sale_30_rolling = rsi_sale_30.rolling(N, min_periods=1).max().astype(bool)
     # 4) Señal de compra
-    df["BUY"] = cruce_alcista #& rsi_sale_30_rolling
+    df["BUY"] = cruce_alcista & rsi_sale_30_rolling
 
     #Señal de Salida
     # Señal de venta básica
     cruce_bajista = (df["EMA5"].shift(1) >= df["EMA20"].shift(1)) & (df["EMA5"] < df["EMA20"])
     sobrecompra = (df["RSI14"] > 70)
-    df["SELL"] = cruce_bajista
+    df["SELL"] = cruce_bajista #| sobrecompra
 
     if len(df.tail(2))>=2:
         SMALP_LD =df["EMA20"].iloc[-2]
@@ -350,8 +239,6 @@ for ticker in tickers:
         RSI14=df["RSI14"].iloc[-1]
         BUY=df["BUY"].iloc[-1]
         SELL=df["SELL"].iloc[-1]
-        dolar_ccl=df["compra_dolar_ccl_ticker"].iloc[-1]
-        dif_ccl_vs_mercado=df["dif_dolar_cedear_vs_ccl"].iloc[-1]
         
     else:
         SMALP_TD ="Sin Dato"
@@ -364,8 +251,6 @@ for ticker in tickers:
         RSI14="Sin Dato"
         BUY="Sin Dato"
         SELL="Sin Dato"
-        dolar_ccl="Sin Dato"
-        dif_ccl_vs_mercado="Sin Dato"
         
     #Formateamos 
     SMALP_LD=formatear_numero(SMALP_LD)
@@ -373,53 +258,51 @@ for ticker in tickers:
     SMALP_TD=formatear_numero(SMALP_TD)
     SMACP_TD=formatear_numero(SMACP_TD)
     cierre=formatear_numero(cierre)
-    racha=formatear_numero(racha)
     Var_nominal=formatear_numero(Var_nominal)
     Var_pct=formatear_numero(Var_pct)
     RSI14=formatear_numero(RSI14)
-    dif_ccl_vs_mercado=formatear_numero(dif_ccl_vs_mercado)
     
     if SELL==True:
         señal="VENDER"
         if ticker in tickers_cedear:
-            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce, racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce, racha, RSI14)
         elif ticker in tickers_acciones:
-            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         elif ticker in tickers_cripto:
-            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         else:
-            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
     elif BUY==True:
         señal="COMPRAR"
         if ticker in tickers_cedear:
             
-            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         elif ticker in tickers_acciones:
-            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         elif ticker in tickers_cripto:
-            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         else:
-            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
     elif (SELL==False) & (BUY==False) & (cruce=="Bajista"):
         señal="Se mantiene Bajista"
         if ticker in tickers_cedear:
-            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         elif ticker in tickers_acciones:
-            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         elif ticker in tickers_cripto:
-            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         else:
-            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
     else:
         señal="Se mantiene Alcista"
         if ticker in tickers_cedear:
-            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_cedear, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         elif ticker in tickers_acciones:
-            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_acciones, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         elif ticker in tickers_cripto:
-            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14,dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_cripto, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
         else:
-            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, dolar_ccl,dif_ccl_vs_mercado)
+            agregar_registro(registros_general, ticker, señal, cierre, Var_nominal, Var_pct, cruce,racha, RSI14)
 
 
     df_precios_concatenado = pd.concat([df_precios_concatenado, df], ignore_index=True)
@@ -450,8 +333,9 @@ def construir_tabla_html(registros, titulo):
     if not registros:
         return f"""
         <h3 style="margin:16px 0 8px 0; color:#111827;">{titulo}</h3>
-        <div style="color:#6b7280; font-size:14px; margin:8px 0 16px 0;">—Sin señales—</div>
+        <div style="color:#6b7280; font-size:14px; margin:8px 0 16px 0;">— Sin señales —</div>
         """
+
     # Estilo de la tabla
     thead = """
     <thead>
@@ -464,11 +348,11 @@ def construir_tabla_html(registros, titulo):
         <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">cruce</th>
         <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">Racha (ruedas)</th>
         <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">RSI14</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">CCL</th>
-        <th style="text-align:right; padding:8px; border-bottom:1px solid #e5e7eb;">CCL vs Mercado</th>
       </tr>
     </thead>
     """
+    
+
     filas = []
     for r in registros:
         señal_low = r["Señal"].lower()
@@ -494,11 +378,9 @@ def construir_tabla_html(registros, titulo):
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['cruce']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['Rachas (ruedas)']}</td>
           <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['RSI14']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['CCL']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['dif_ccl_vs_mercado']}</td>
         </tr>
         """)
-        
+
     tbody = f"<tbody>{''.join(filas)}</tbody>"
 
     return f"""
@@ -510,6 +392,7 @@ def construir_tabla_html(registros, titulo):
       </table>
     </div>
     """
+
 
 tabla_cedear   = construir_tabla_html(registros_cedear,   "CEDEARs")
 tabla_acciones = construir_tabla_html(registros_acciones, "Acciones locales")
@@ -559,7 +442,6 @@ html_body = f"""
 
 # Adjuntar HTML
 mensaje.attach(MIMEText(html_body, "html"))
-
 
 # === Adjuntar Excel ANTES de enviar ===
 fname = f"precios_{fecha_hoy_str.replace('/','-').replace(':','-')}.xlsx"

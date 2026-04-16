@@ -336,7 +336,6 @@ def construir_tabla_html(registros, titulo):
         <div style="color:#6b7280; font-size:14px; margin:8px 0 16px 0;">— Sin señales —</div>
         """
 
-    # Estilo de la tabla
     thead = """
     <thead>
       <tr>
@@ -351,33 +350,51 @@ def construir_tabla_html(registros, titulo):
       </tr>
     </thead>
     """
-    
 
     filas = []
     for r in registros:
-        señal_low = r["Señal"].lower()
-        color = "#111827"        # negro
-        bg    = "transparent"    # fondo
-        if "comprar" in señal_low or "alcista" in señal_low:
-            color = "#065f46"    # verde oscuro
-            bg    = "#ecfdf5"
-        if "vender" in señal_low or "bajista" in señal_low:
-            color = "#991b1b"    # rojo oscuro
-            bg    = "#fef2f2"
-        if "se mantiene" in señal_low:
-            color = "#374151"
-            bg    = "#f9fafb"
+        señal_low = str(r["Señal"]).lower()
+        cruce_low = str(r["cruce"]).lower()
+
+        # Color del texto de señal
+        color = "#111827"
+        if "comprar" in señal_low:
+            color = "#065f46"
+        elif "vender" in señal_low:
+            color = "#991b1b"
+        elif "se mantiene alcista" in señal_low:
+            color = "#065f46"
+        elif "se mantiene bajista" in señal_low:
+            color = "#991b1b"
+
+        # Background SOLO si hubo cambio
+        bg = "transparent"
+        if cruce_low == "cambio a alcista":
+            bg = "#ecfdf5"
+        elif cruce_low == "cambio a bajista":
+            bg = "#fef2f2"
+
+        # Color del texto de cruce
+        cruce_color = "#111827"
+        if cruce_low == "cambio a alcista":
+            cruce_color = "#065f46"
+        elif cruce_low == "cambio a bajista":
+            cruce_color = "#991b1b"
+        elif cruce_low == "alcista":
+            cruce_color = "#065f46"
+        elif cruce_low == "bajista":
+            cruce_color = "#991b1b"
 
         filas.append(f"""
         <tr style="background:{bg};">
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6;">{r['Ticker']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; color:{color};">{r['Señal']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['Cierre']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['vs LD $']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['vs LD %']}%</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['cruce']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['Rachas (ruedas)']}</td>
-          <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['RSI14']}</td>
+        <td style="padding:8px; border-bottom:1px solid #f3f4f6;">{r['Ticker']}</td>
+        <td style="padding:8px; border-bottom:1px solid #f3f4f6; color:{color}; font-weight:bold;">{r['Señal']}</td>
+        <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['Cierre']}</td>
+        <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">${r['vs LD $']}</td>
+        <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['vs LD %']}%</td>
+        <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right; color:{cruce_color}; font-weight:bold;">{r['cruce']}</td>
+        <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['Rachas (ruedas)']}</td>
+        <td style="padding:8px; border-bottom:1px solid #f3f4f6; text-align:right;">{r['RSI14']}</td>
         </tr>
         """)
 

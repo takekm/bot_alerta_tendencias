@@ -459,7 +459,7 @@ html_body = f"""
 
 # Adjuntar HTML
 mensaje.attach(MIMEText(html_body, "html"))
-
+"""
 # === Adjuntar Excel ANTES de enviar ===
 fname = f"precios_{fecha_hoy_str.replace('/','-').replace(':','-')}.xlsx"
 buffer = BytesIO()
@@ -474,6 +474,7 @@ buffer.seek(0)
 adjunto = MIMEApplication(buffer.read(), _subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 adjunto.add_header("Content-Disposition", "attachment", filename=fname)
 mensaje.attach(adjunto)
+"""
 
 # === Enviar ===
 try:

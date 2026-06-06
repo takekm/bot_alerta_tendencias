@@ -27,7 +27,7 @@ tickers_cedear = [
     "XOM","CVX","SHEL","BP","RIO","VALE","BHP",
 
     #Automotriz
-    'TSLA', 'TM', 'F', 'GM', 'HMC','VOWG','MBG', 'BMW','RNO','BYDDY',
+    'TSLA', 'TM', 'F', 'GM', 'HMC','MBG', 'BMW','RNO','BYDDY',
 
     # Salud
     "PFE","JNJ","MRK","ABBV","LLY",

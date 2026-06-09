@@ -52,7 +52,7 @@ tickers_acciones = [
     "HARG.BA", "CELU.BA",
 
     # Consumo & retail
-    "TGSU2.BA", "CRES.BA", "DYCA.BA", "SEMI.BA", "CARC.BA", "MIRG.BA",
+    "TGSU2.BA", "CRES.BA", "SEMI.BA", "CARC.BA", "MIRG.BA",
     "AGRO.BA", "INTR.BA",
 
     # Telecomunicaciones & tecnología
